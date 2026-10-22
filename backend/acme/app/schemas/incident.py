@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from app.models import Priority, Status, Category
 
@@ -12,7 +12,7 @@ class IncidentBase(BaseModel):
     resolved_at: datetime | None = None
     resolved_by: int | None = None
     seat_id: int
-    incident_notes: str | None = None
+    incident_notes: str | None = Field(default=None, max_length=120)
 
 
 class IncidentRead(IncidentBase):

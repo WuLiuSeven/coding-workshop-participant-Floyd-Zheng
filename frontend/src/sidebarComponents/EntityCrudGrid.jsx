@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { cloneElement, useMemo, useState } from 'react';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { DataGrid, GridActionsCellItem } from '@mui/x-data-grid';
 import {
     Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-    FormControlLabel, MenuItem, Stack, Switch, TextField,
+    FormControlLabel, MenuItem, Stack, Switch, TextField, Tooltip,
 } from '@mui/material';
 
 /*
@@ -14,6 +14,9 @@ import {
  *   { name: 'facility_id', label: 'Facility', type: 'select', options: [{ value, label }], required: true }
  *   type: 'text' | 'textarea' | 'number' | 'select' | 'boolean'
  *   optional: maxLength (text/textarea), nullable (empty text is sent as null)
+ *
+ * Row actions: every icon shows a hover tooltip. It uses the action's `tooltip`
+ * prop if given, otherwise its `label`. Disabled actions still show their tooltip.
  */
 
 const emptyValue = (f) => (f.type === 'boolean' ? false : '');
@@ -45,6 +48,26 @@ export function apiErrorMessage(error) {
     const detail = error?.response?.data?.detail;
     if (Array.isArray(detail)) return detail.map((d) => d.msg).join('; ');
     return detail ?? 'Request failed';
+}
+
+// Adds a hover tooltip to a <GridActionsCellItem>. A truly disabled button
+// swallows mouse events (so no tooltip), so disabled actions are instead
+// rendered dimmed and inert, which keeps the tooltip working.
+function withTooltip(action) {
+    if (!action || action.props.showInMenu) return action;
+    const { tooltip, label, icon, disabled, onClick, sx } = action.props;
+    return cloneElement(action, {
+        tooltip: undefined,
+        icon: (
+            <Tooltip title={tooltip ?? label} arrow placement="top" enterDelay={150}>
+                <span style={{ display: 'inline-flex' }}>{icon}</span>
+            </Tooltip>
+        ),
+        disabled: false,
+        'aria-disabled': disabled || undefined,
+        onClick: disabled ? undefined : onClick,
+        sx: disabled ? { ...sx, opacity: 0.38, cursor: 'not-allowed' } : sx,
+    });
 }
 
 function EntityCrudGrid({
@@ -130,6 +153,7 @@ function EntityCrudGrid({
     const allColumns = useMemo(() => {
         const iconCount = (extraActions ? extraActionCount : 0) + (canEdit ? 1 : 0) + (canDelete ? 1 : 0);
         if (iconCount === 0) return columns;
+        const noun = entityLabel.toLowerCase();
         return [
             {
                 field: 'actions',
@@ -140,18 +164,20 @@ function EntityCrudGrid({
                     ...(extraActions ? extraActions(params.row) : []),
                     ...(canEdit && canEditRow(params.row)
                         ? [<GridActionsCellItem key="edit" icon={<EditIcon />} label="Edit"
+                            tooltip={`Edit this ${noun}`}
                             onClick={() => openEdit(params.row)} />]
                         : []),
                     ...(canDelete && canDeleteRow(params.row)
                         ? [<GridActionsCellItem key="delete" icon={<DeleteIcon />} label="Delete"
+                            tooltip={`Delete this ${noun}`}
                             onClick={() => handleDelete(params.row)} />]
                         : []),
-                ],
+                ].map(withTooltip),
             },
             ...columns,
         ];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [columns, canEdit, canDelete, canEditRow, canDeleteRow, extraActions, extraActionCount, fields]);
+    }, [columns, canEdit, canDelete, canEditRow, canDeleteRow, extraActions, extraActionCount, fields, entityLabel]);
 
     return (
         <Box>

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import apiClient from '../api/client.js';
-import ReportProblemIcon from '@mui/icons-material/ReportProblem';
-import ListAltIcon from '@mui/icons-material/ListAlt';
-import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
+import ManageSearchIcon from '@mui/icons-material/ManageSearch';
+import KeyboardDoubleArrowUpIcon from '@mui/icons-material/KeyboardDoubleArrowUp';
 import ChatBubbleOutlineIcon from '@mui/icons-material/Comment';
 import { GridActionsCellItem } from '@mui/x-data-grid';
-import { Alert, Box, Chip, CircularProgress, Tab, Tabs } from '@mui/material';
+import { Alert, Badge, Box, Chip, CircularProgress, Tab, Tabs } from '@mui/material';
 
 import { useAuth } from '../context/AuthContext.jsx';
 import EntityCrudGrid, { apiErrorMessage } from './EntityCrudGrid.jsx';
@@ -13,6 +13,7 @@ import ReportIncidentDialog, {
     CATEGORY_OPTIONS, NEW_INCIDENT_STATUS, PRIORITY_OPTIONS, RESOLVED_STATUS, STATUS_OPTIONS,
 } from './ReportIncidentDialog.jsx';
 import IncidentNotesDialog from './IncidentNotesDialog.jsx';
+import IncidentAnalytics, { classifyIncident, stateLabel } from './IncidentAnalytics.jsx';
 
 // Adjust to match your router prefixes
 const API = {
@@ -34,9 +35,8 @@ const NOTE_MAX_LENGTH = 250;                 // comments is String(250)
 const FACILITY_ADMIN_ROLE = 'Facility_Admin';
 const ENGINEER_ROLE = 'Engineer';
 
-// An incident counts as resolved if its status says so or it has a resolved date
-const isResolved = (incident) =>
-    String(incident.status).toLowerCase() === RESOLVED_STATUS || Boolean(incident.resolved_at);
+// An incident counts as resolved if its status is Resolved/Closed or it has a resolved date
+const isResolved = (incident) => classifyIncident(incident) === 'completed';
 
 const toOptions = (values) => values.map((v) => ({ value: v, label: v }));
 
@@ -55,6 +55,7 @@ function LocationsDataGrid({ onSuccess }) {
     const [error, setError] = useState(null);
     const [reportSeat, setReportSeat] = useState(null);          // seat row the incident dialog is open for
     const [incidentSeatFilter, setIncidentSeatFilter] = useState(null);
+    const [incidentStateFilter, setIncidentStateFilter] = useState(null);  // set by clicking the pie chart
     const [actionError, setActionError] = useState(null);         // errors from row actions like escalate
     const [notesIncidentId, setNotesIncidentId] = useState(null); // incident the notes dialog is open for
 
@@ -137,7 +138,8 @@ function LocationsDataGrid({ onSuccess }) {
                     ? `${seat.facility_name} / ${seat.building_name} / Floor ${seat.floor_number} / Seat ${seat.seat_number ?? seat.id}`
                     : `Seat ${i.seat_id}`,
                 created_display: i.created_at ? new Date(i.created_at).toLocaleString() : '',
-                state: isResolved(i) ? 'Resolved' : i.acknowledged_at ? 'Acknowledged' : 'New',
+                state_key: classifyIncident(i),
+                state: stateLabel(classifyIncident(i)),
             };
         });
 
@@ -191,17 +193,22 @@ function LocationsDataGrid({ onSuccess }) {
     const seatActions = useCallback((row) => [
         <GridActionsCellItem
             key="report"
-            icon={<ReportProblemIcon color="warning" />}
+            icon={<FlagOutlinedIcon color="warning" />}
             label="Report incident"
+            tooltip="Report a problem with this seat"
             onClick={() => setReportSeat(row)}
         />,
         <GridActionsCellItem
             key="view"
-            icon={<ListAltIcon />}
+            icon={<ManageSearchIcon color={row.total_incidents === 0 ? undefined : 'primary'} />}
             label="View incidents"
+            tooltip={row.total_incidents === 0
+                ? 'No incidents reported for this seat'
+                : `View ${row.total_incidents} incident${row.total_incidents === 1 ? '' : 's'} for this seat`}
             disabled={row.total_incidents === 0}
             onClick={() => {
                 setIncidentSeatFilter(row);
+                setIncidentStateFilter(null);
                 setTab('incidents');
             }}
         />,
@@ -240,14 +247,26 @@ function LocationsDataGrid({ onSuccess }) {
     const incidentActions = useCallback((row) => [
         <GridActionsCellItem
             key="notes"
-            icon={<ChatBubbleOutlineIcon />}
+            icon={
+                <Badge color="primary" badgeContent={row.note_count} invisible={row.note_count === 0} max={99}>
+                    <ChatBubbleOutlineIcon />
+                </Badge>
+            }
             label={`Notes (${row.note_count})`}
+            tooltip={row.note_count === 0
+                ? 'Add a note to this incident'
+                : `View or add notes (${row.note_count} so far)`}
             onClick={() => setNotesIncidentId(row.id)}
         />,
         <GridActionsCellItem
             key="escalate"
-            icon={<PriorityHighIcon color={row.is_escalated ? 'disabled' : 'error'} />}
+            icon={<KeyboardDoubleArrowUpIcon color={row.is_escalated || isResolved(row) ? 'disabled' : 'error'} />}
             label={row.is_escalated ? 'Already escalated' : 'Escalate'}
+            tooltip={row.is_escalated
+                ? 'Already escalated to a facility admin'
+                : isResolved(row)
+                    ? 'Resolved incidents can’t be escalated'
+                    : 'Escalate: flag this incident as urgent for a facility admin'}
             disabled={row.is_escalated || isResolved(row)}
             onClick={() => handleEscalate(row)}
         />,
@@ -330,12 +349,16 @@ function LocationsDataGrid({ onSuccess }) {
         return {
             ...base,
             onUpdate: (row, payload) => {
+                // compare case-insensitively on BOTH sides (previously only one side was lowercased,
+                // so resolved_at was never stamped and acknowledged_at was stamped on every edit)
                 const status = String(payload.status).toLowerCase();
+                const isNew = status === NEW_INCIDENT_STATUS.toLowerCase();
+                const isDone = status === RESOLVED_STATUS.toLowerCase() || status === 'closed';
                 const now = new Date().toISOString();
                 const next = { ...payload };
-                if (status !== NEW_INCIDENT_STATUS && !row.acknowledged_at) next.acknowledged_at = now;
-                if (status === RESOLVED_STATUS && !row.resolved_at) next.resolved_at = now;
-                if (status !== RESOLVED_STATUS && row.resolved_at) next.resolved_at = null;   // reopened
+                if (!isNew && !row.acknowledged_at) next.acknowledged_at = now;
+                if (isDone && !row.resolved_at) next.resolved_at = now;
+                if (!isDone && row.resolved_at) next.resolved_at = null;   // reopened
                 return base.onUpdate(row, next);
             },
         };
@@ -349,15 +372,25 @@ function LocationsDataGrid({ onSuccess }) {
         ? [...(derived.notesByIncident.get(notesIncident.id) ?? [])].sort((a, b) => a.id - b.id)
         : [];
 
-    const visibleIncidents = incidentSeatFilter
-        ? derived.incidentRows.filter((i) => i.seat_id === incidentSeatFilter.id)
-        : derived.incidentRows;
+    const visibleIncidents = derived.incidentRows.filter((i) =>
+        (!incidentSeatFilter || i.seat_id === incidentSeatFilter.id) &&
+        (!incidentStateFilter || i.state_key === incidentStateFilter)
+    );
+
+    // one click on a pie slice -> straight to the matching incidents
+    const showIncidentsInState = (stateKey) => {
+        setIncidentStateFilter(stateKey);
+        setIncidentSeatFilter(null);
+        setTab('incidents');
+    };
 
     if (loading) return <CircularProgress />;
     if (error) return <Alert severity="error">{error}</Alert>;
 
     return (
         <Box>
+            <IncidentAnalytics incidents={data.incidents} onSelectState={showIncidentsInState} />
+
             <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
                 <Tab value="seats" label={`Seats (${data.seats.length})`} />
                 <Tab value="mine" label={`My Incidents (${derived.myIncidentRows.length})`} />
@@ -453,11 +486,22 @@ function LocationsDataGrid({ onSuccess }) {
                     extraActionCount={2}
                     deleteWarning="This permanently removes the incident."
                     {...incidentCrud}
-                    toolbarExtra={incidentSeatFilter && (
-                        <Chip
-                            label={`Seat ${incidentSeatFilter.seat_number ?? incidentSeatFilter.id} — ${incidentSeatFilter.building_name}`}
-                            onDelete={() => setIncidentSeatFilter(null)}
-                        />
+                    toolbarExtra={(incidentSeatFilter || incidentStateFilter) && (
+                        <>
+                            {incidentStateFilter && (
+                                <Chip
+                                    color="primary"
+                                    label={`Status: ${stateLabel(incidentStateFilter)}`}
+                                    onDelete={() => setIncidentStateFilter(null)}
+                                />
+                            )}
+                            {incidentSeatFilter && (
+                                <Chip
+                                    label={`Seat ${incidentSeatFilter.seat_number ?? incidentSeatFilter.id} — ${incidentSeatFilter.building_name}`}
+                                    onDelete={() => setIncidentSeatFilter(null)}
+                                />
+                            )}
+                        </>
                     )}
                 />
             )}

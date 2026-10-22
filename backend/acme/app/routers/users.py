@@ -14,6 +14,8 @@ import uuid
 import jwt
 import os
 
+# Enums for users: "Employee", "Engineer", "Facility_Admin"
+
 SECRET_KEY = os.environ.get("SECRET_KEY", "<replace-with-a-real-secret-key>")
 
 
@@ -56,12 +58,18 @@ async def register_user(
     db: AsyncSession = Depends(get_db),
     _ : User = Depends(require_role(Role.FACILITY_ADMIN)),
 ) -> User:
-    #Password checker TODO
+    
     existing = await db.execute(select(User).where(func.lower(User.email) == payload.email.lower()))
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Email '{payload.email}' is already used",
+        )
+        
+    if payload.password is None or len(payload.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long",
         )
 
     user = User(
@@ -88,6 +96,14 @@ async def register_user(payload: UserCreate,
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email must contain 'acme.inc'",
+        )
+
+    strip_password = payload.password.strip()
+
+    if len(strip_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long",
         )
 
     # Check if email already exists (case-insensitive)
