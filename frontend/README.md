@@ -1,63 +1,16 @@
-# Coding Workshop - Frontend Code
+# React + Vite
 
-## Overview
+This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
-This folder contains React frontend application with hello world example.
+Currently, two official plugins are available:
 
-## Prerequisites
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-- React - JavaScript library for building user interfaces
-- React Router - Client-side routing for React
-- Material UI - Comprehensive UI component library
+## React Compiler
 
-## Structure
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-```
-coding-workshop-participant/
-├── frontend/              # React frontend
-│   ├── public/              # Public assets
-│   ├── src/                 # Source code
-│   │   ├── pages/             # Page components
-│   │   ├── components/        # Reusable components
-│   │   ├── services/          # API client
-│   │   └── App.js             # Main app
-│   ├── .env.sample          # React environment variables
-│   ├── eslint.config.js     # ESLint JS tool configuration
-│   ├── index.html           # Landing page
-│   ├── package.json         # App metadata with dependencies
-│   ├── README.md            # Frontend guide (YOU ARE HERE)
-│   └── vite.config.js       # Vite build tool configuration
-├── ...
-```
+## Expanding the Oxlint configuration
 
-## Usage
-
-### Local Development
-
-To run your application locally:
-
-```sh
-./bin/start-dev.sh
-```
-
-To view your application, open the browser and navigate to `http://localhost:3000`.
-
-### Cloud Deployment
-
-To deploy your frontend to AWS:
-
-```sh
-./bin/deploy-frontend.sh
-```
-
-To view your application, open the browser and navigate to CloudFront URL.
-
-## Clean Up
-
-To remove all deployed resources (including frontend):
-
-```sh
-./bin/cleanup-environment.sh
-```
-
-**Warning**: This removes all infra resources. Cannot be undone.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
