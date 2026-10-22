@@ -52,7 +52,7 @@ async def update_building(building_id: int, payload: BuildingBase, db: AsyncSess
     if building is None:
         raise HTTPException(
                     status_code=status.HTTP_404_NOT_Found,
-                    detail=f"Building '{building}' not found"
+                    detail=f"Building '{building_id}' not found"
                 )
 
     building.name = payload.name

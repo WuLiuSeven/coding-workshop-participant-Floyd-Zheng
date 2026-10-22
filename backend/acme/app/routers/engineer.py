@@ -52,7 +52,7 @@ async def update_engineer(engineer_id: int, payload: EngineerBase, db: AsyncSess
     if engineer is None:
         raise HTTPException(
                     status_code=status.HTTP_404_NOT_Found,
-                    detail=f"Engineer '{engineer}' not found"
+                    detail=f"Engineer '{engineer_id}' not found"
                 )
 
     engineer.is_available = payload.is_available

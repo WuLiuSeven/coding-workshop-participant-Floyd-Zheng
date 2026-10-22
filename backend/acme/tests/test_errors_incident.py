@@ -65,7 +65,6 @@ class TestValidation:
         r = await mocked_client.post("/incident", json={**VALID_CREATE, field: bad})
         assert r.status_code == 422
 
-    @pytest.mark.xfail(strict=False, reason="passes only if IncidentBase sets max_length=120 on incident_notes")
     async def test_create_notes_over_120_chars(self, mocked_client):
         mocked_client.as_user(EMPLOYEE)
         r = await mocked_client.post("/incident", json={**VALID_CREATE, "incident_notes": "x" * 121})

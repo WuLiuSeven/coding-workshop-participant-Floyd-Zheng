@@ -118,7 +118,7 @@ async def update_incident(
     for field, value in updates.items():
         if value is None and field not in nullable_fields:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=422,
                 detail=f"{field} cannot be null",
             )
 

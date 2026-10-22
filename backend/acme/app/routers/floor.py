@@ -1,5 +1,5 @@
 from app.dependencies import get_db, require_role, get_current_user
-from app.models import Floor, User, Role
+from app.models import Floor, User, Role, Building
 from app.schemas.floor import FloorBase, FloorRead
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
@@ -20,6 +20,13 @@ async def list_floor(db: AsyncSession = Depends(get_db),
 async def create_floor(payload: FloorBase, db: AsyncSession = Depends(get_db)
                            , _: User = Depends(require_role(Role.FACILITY_ADMIN))
                            ) -> FloorRead:
+
+    building = await db.get(Building, payload.building_id)
+    if building is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Building {payload.building_id} not found",
+        )
 
     floor = Floor(**payload.model_dump())
     db.add(floor)
@@ -49,12 +56,18 @@ async def update_floor(floor_id: int, payload:FloorBase, db: AsyncSession = Depe
                         ) -> Floor:
     floor = await db.get(Floor, floor_id)
 
+    building = await db.get(Building, payload.building_id)
+    if building is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Building {payload.building_id} not found",
+        )
+
     if floor is None:
         raise HTTPException(
-                    status_code=status.HTTP_404_NOT_Found,
-                    detail=f"Floor '{floor}' not found"
-                )
-
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Floor {floor_id} not found",
+        )
     floor.floor_number = payload.floor_number
     floor.building_id = payload.building_id
 

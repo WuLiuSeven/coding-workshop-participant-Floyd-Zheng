@@ -118,7 +118,7 @@ async def update_ticket(ticket_id: int, payload: TicketUpdate, db: AsyncSession 
     for field, value in updates.items():
         if value is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=422,
                 detail=f"{field} cannot be null",
             )
 

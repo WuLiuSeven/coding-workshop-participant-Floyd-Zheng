@@ -77,15 +77,14 @@ async def update_note(note_id: int, payload: NoteUpdate,
     updates = payload.model_dump(exclude_unset=True)
 
     for field, value in updates.items():
+        if value is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field} cannot be null",
+            )
+
         if field == "incident_at":
-            if value is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="incident_at cannot be null",
-                )
-
             incident = await db.get(Incident, value)
-
             if incident is None:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -93,6 +92,7 @@ async def update_note(note_id: int, payload: NoteUpdate,
                 )
 
         setattr(note, field, value)
+            
 
     await db.commit()
     await db.refresh(note)

@@ -1,9 +1,9 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NoteBase(BaseModel):
-    comments: str | None = None
+    comments: str | None = Field(default=None, max_length=250)
     incident_at: int
 
 

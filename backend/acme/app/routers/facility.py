@@ -52,7 +52,7 @@ async def update_facility(facility_id: int, payload: FacilityBase, db: AsyncSess
     if facility is None:
         raise HTTPException(
                     status_code=status.HTTP_404_NOT_Found,
-                    detail=f"Facility '{facility}' not found"
+                    detail=f"Facility '{facility_id}' not found"
                 )
 
     facility.name = payload.name
